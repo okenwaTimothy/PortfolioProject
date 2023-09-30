@@ -1,0 +1,92 @@
+
+SELECT*
+FROM `peak-geode-399512.Covid.covidDeath`;
+
+SELECT*
+FROM `peak-geode-399512.Covid.covidVaccinations`;
+
+SELECT
+  location, date, total_cases, new_cases, total_deaths, population
+FROM `peak-geode-399512.Covid.covidDeath`
+ORDER BY 1,2;
+
+---LOOKING AT TOTAL CASES VS TOTAL DEATHS
+---Exploring probability of dying from Covid per country
+
+SELECT
+  location, date, total_cases, total_deaths, (total_deaths/total_cases)*100 as deathPercentage
+FROM `peak-geode-399512.Covid.covidDeath`
+where location = 'Nigeria' and total_cases is not null
+ORDER BY 1,2;
+
+---LOOKING AT TOTAL CASES VS POPULATION -- percentage of population with COVID
+
+SELECT
+  location, date, total_cases, population, (total_cases/population)*100 as covidPopPercentage
+FROM `peak-geode-399512.Covid.covidDeath`
+where location = 'Nigeria' and total_cases is not null
+ORDER BY 1,2;
+
+---LOOKING AT COUNTRIES WITH HIGHEST INFECTION RATE COMPARED TO POPULATION
+
+SELECT
+  location, max(total_cases) as maxTotalCase, population, (max(total_cases)/population)*100 as covidPopPercentage
+FROM `peak-geode-399512.Covid.covidDeath`
+GROUP BY location, population
+ORDER BY 4 desc;
+
+---LOOKING AT DEATH RATE IN NIGERIA AND AFRICA
+SELECT
+  location, max(total_cases) as maxTotalCase, max(total_deaths) as maxTotalDeath, (max(total_deaths)/max(total_cases))*100 as deathRate
+FROM `peak-geode-399512.Covid.covidDeath`
+WHERE location = 'Nigeria' or location = 'Africa'
+GROUP BY location;
+
+---LOOKING AT DEATH RATE PER CONTINENT
+SELECT
+  continent, max(total_cases) as maxTotalCase, max(total_deaths) as maxTotalDeath, (max(total_deaths)/max(total_cases))*100 as deathRate
+FROM `peak-geode-399512.Covid.covidDeath`
+WHERE continent is not null
+GROUP BY continent
+ORDER BY 4 desc;
+
+---LOOKING AT POPULATION AND VACCINATION
+SELECT*
+FROM `peak-geode-399512.Covid.covidVaccinations`;
+
+SELECT
+  dea.continent, dea.location, max(v.total_vaccinations) as maxTotalVacc, dea.population, max(v.total_vaccinations)/dea.population*100
+  as vaccPercentage
+FROM `peak-geode-399512.Covid.covidDeath` dea
+INNER JOIN `peak-geode-399512.Covid.covidVaccinations` v
+ON dea.location = v.location
+GROUP BY dea.continent, dea.location, dea.population
+ORDER BY 1,2;
+
+---USING CTE TEMP TABLE
+
+with percentVacc as (
+SELECT
+  dea.continent, dea.location,v.date, dea.population, v.new_vaccinations, sum(v.new_vaccinations) over (partition by dea.location order by dea.location) as peopleVacc
+FROM `peak-geode-399512.Covid.covidDeath` dea
+INNER JOIN `peak-geode-399512.Covid.covidVaccinations` v
+ON dea.location = v.location
+WHERE dea.continent is not null
+GROUP BY dea.continent, dea.location, dea.population, v.new_vaccinations, v.date
+)
+
+SELECT*FROM percentVacc
+ORDER BY 1,2,3;
+
+---CREATING VIEW FOR DATA STORAGE AND VISUALIZATION
+
+CREATE VIEW `peak-geode-399512.Covid.percentVacc` as
+SELECT
+  dea.continent, dea.location,v.date, dea.population, v.new_vaccinations, sum(v.new_vaccinations) over (partition by dea.location order by dea.location) as peopleVacc
+FROM `peak-geode-399512.Covid.covidDeath` dea
+INNER JOIN `peak-geode-399512.Covid.covidVaccinations` v
+ON dea.location = v.location
+WHERE dea.continent is not null
+GROUP BY dea.continent, dea.location, dea.population, v.new_vaccinations, v.date;
+
+SELECT*FROM `peak-geode-399512.Covid.percentVacc`
